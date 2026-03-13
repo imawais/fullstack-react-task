@@ -1,73 +1,15 @@
-# React + TypeScript + Vite
+# Venue Seat Picker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Getting started
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev       # http://localhost:5173
+pnpm test      # run unit tests
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The app renders every seat from `public/venue.json` as an SVG circle at its absolute coordinates. I chose SVG over Canvas because each circle becomes a real DOM element — that means `aria-label`, `tabIndex`, and keyboard events (Enter/Space to select, Tab to navigate) all work without building any custom accessibility infrastructure. The trade-off is that at very large seat counts (15,000+) the DOM gets heavy. The practical fix would be viewBox culling — filtering out seats outside the current visible area before rendering — which I've left as a TODO since the spec data is small enough that it isn't a problem yet.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Selection state lives in a `Set<string>` of seat IDs rather than an array. The reason is performance: `Set.has()` is O(1) and gets called once per seat on every render, so with thousands of seats an array `.includes()` would be noticeably slower. The selection is written to `localStorage` via a `useEffect` on every change, so it survives page reloads automatically. Data fetching and flattening (section → row → seat) happens once in `useVenue` at load time, so components always receive a flat list and never need to think about the nested JSON structure.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Two things are incomplete: the Checkout button is wired up visually but doesn't navigate anywhere, and there are no end-to-end tests — the two unit test files cover the selection logic and pricing utilities but not the full user interaction flow. Playwright tests for the click → detail panel → summary flow would be the next thing to add.
